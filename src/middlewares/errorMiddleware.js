@@ -4,7 +4,7 @@ const errorMiddlewareHandler = (err, _req, res, next) => {
   res.status(statusCode).json({
     message: err.message,
     statusCode: statusCode,
-    stack: err.stack,
+    // stack: err.stack,
   });
 };
 
