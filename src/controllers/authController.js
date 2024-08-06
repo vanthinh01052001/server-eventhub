@@ -77,15 +77,9 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
-const handleSendEmail = async (val, email) => {
+const handleSendEmail = async (val) => {
   try {
-    await transporter.sendMail({
-      from: `Support EventHub Application <${process.env.USERNAME_EMAIL}>`,
-      to: email,
-      subject: "Vertification email code",
-      text: "Your code to verification email",
-      html: `<h1>${val}</h1>`,
-    });
+    await transporter.sendMail(val);
     return "OK";
   } catch (error) {
     return `Can not send email ${error}`;
@@ -95,7 +89,14 @@ const verification = asyncHandler(async (req, res) => {
   const { email } = req.body;
   const verificationCode = Math.floor(1000 + Math.random() * 9000);
   try {
-    await handleSendEmail(verificationCode, email);
+    const data = {
+      from: `Support EventHub Application <${process.env.USERNAME_EMAIL}>`,
+      to: email,
+      subject: "Vertification email code",
+      text: "Your code to verification email",
+      html: `<h1>${verificationCode}</h1>`,
+    };
+    await handleSendEmail(data);
     res.status(200).json({
       status: 200,
       message: "Send verification code successfully!",
@@ -110,8 +111,63 @@ const verification = asyncHandler(async (req, res) => {
     });
   }
 });
+const generateRandomPassword = (length) => {
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+[]{}|;:,.<>?";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    password += characters[randomIndex];
+  }
+  return password;
+};
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const randomPassword = generateRandomPassword(8);
+  const data = {
+    from: `New password <${process.env.USERNAME_EMAIL}>`,
+    to: email,
+    subject: "Reset password",
+    text: "Your password is: ",
+    html: `<h1>${randomPassword}</h1>`,
+  };
+
+  const user = await UserModel.findOne({ email });
+  if (user) {
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(`${randomPassword}`, salt);
+    await UserModel.findByIdAndUpdate(user._id, {
+      password: hashedPassword,
+      isChangePassword: true,
+    })
+      .then(() => {
+        console.log("Done");
+      })
+      .catch((error) => console.log(error));
+    await handleSendEmail(data)
+      .then(() => {
+        res.status(200).json({
+          status: 200,
+          message: "Send email new password successfully.",
+          data: [],
+        });
+      })
+      .catch((error) => {
+        res.status(401).json({
+          status: 401,
+          message: "Reset Password Failed.",
+        });
+      });
+  } else {
+    res.status(401).json({
+      status: 401,
+      message: "User not found.",
+    });
+  }
+});
 module.exports = {
   register,
   login,
   verification,
+  forgotPassword,
 };
