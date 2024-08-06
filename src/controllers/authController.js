@@ -2,6 +2,24 @@ const UserModel = require("../models/userModel");
 const bcrypt = require("bcrypt");
 const asyncHandler = require("express-async-handler");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+require("dotenv").config();
+
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 587,
+  auth: {
+    user: process.env.USERNAME_EMAIL,
+    pass: process.env.PASSWORD_EMAIL,
+  },
+});
+const getJsonWebToken = async (email, id) => {
+  const payload = { email, id };
+  const token = jwt.sign(payload, process.env.SECRET_KEY, {
+    expiresIn: "7d",
+  });
+  return token;
+};
 
 const register = asyncHandler(async (req, res) => {
   const { fullname, email, password } = req.body;
@@ -58,15 +76,42 @@ const login = asyncHandler(async (req, res) => {
     },
   });
 });
+
+const handleSendEmail = async (val, email) => {
+  try {
+    await transporter.sendMail({
+      from: `Support EventHub Application <${process.env.USERNAME_EMAIL}>`,
+      to: email,
+      subject: "Vertification email code",
+      text: "Your code to verification email",
+      html: `<h1>${val}</h1>`,
+    });
+    return "OK";
+  } catch (error) {
+    return `Can not send email ${error}`;
+  }
+};
+const verification = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const verificationCode = Math.floor(1000 + Math.random() * 9000);
+  try {
+    await handleSendEmail(verificationCode, email);
+    res.status(200).json({
+      status: 200,
+      message: "Send verification code successfully!",
+      data: {
+        code: verificationCode,
+      },
+    });
+  } catch (error) {
+    res.status(401).json({
+      status: 401,
+      message: "Send verification code failed!",
+    });
+  }
+});
 module.exports = {
   register,
   login,
-};
-
-const getJsonWebToken = async (email, id) => {
-  const payload = { email, id };
-  const token = jwt.sign(payload, process.env.SECRET_KEY, {
-    expiresIn: "7d",
-  });
-  return token;
+  verification,
 };
