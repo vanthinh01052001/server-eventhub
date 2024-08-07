@@ -195,10 +195,41 @@ const handleLoginWithGoogle = asyncHandler(async (req, res) => {
     data: user,
   });
 });
+const handleLoginWithFacebook = asyncHandler(async (req, res) => {
+  const userInfo = req.body;
+  const existingUser = await UserModel.findOne({ email: userInfo.email });
+  let user = { ...userInfo };
+  if (existingUser) {
+    const updateUser = {
+      fullname: userInfo.name,
+      email: userInfo.email,
+      photoUrl: userInfo.photo,
+      updatedAt: Date.now(),
+      ...userInfo,
+    };
+    await UserModel.findByIdAndUpdate(existingUser._id, updateUser);
+    user.accessToken = await getJsonWebToken(userInfo.email, userInfo.id);
+  } else {
+    const newUser = new UserModel({
+      fullname: userInfo.name,
+      email: userInfo.email,
+      photoUrl: userInfo.photo,
+      ...userInfo,
+    });
+    await newUser.save();
+    user.accessToken = await getJsonWebToken(userInfo.email, newUser._id);
+  }
+  res.status(200).json({
+    status: 200,
+    message: "Login with Facebook successfully.",
+    data: user,
+  });
+});
 module.exports = {
   register,
   login,
   verification,
   forgotPassword,
   handleLoginWithGoogle,
+  handleLoginWithFacebook,
 };
